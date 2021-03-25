@@ -13,14 +13,12 @@ type Notifier interface {
 	Notify(event health.HealthEventDetail) error
 }
 
-func LambdaHandler(ctx context.Context, event health.HealthEvent) error {
+func LambdaHandler(ctx context.Context, event health.HealthEvent) {
 	s, err := slack.New()
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
 	s.Notify(event)
-
-	return nil
 }
 
 func main() {
