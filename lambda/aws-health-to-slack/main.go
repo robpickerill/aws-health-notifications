@@ -2,16 +2,23 @@ package main
 
 import (
 	"context"
+	"log"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/rpickerill/aws-health-to-slack/internal/health"
+	"github.com/rpickerill/aws-health-to-slack/internal/notifiers/slack"
 )
 
 type Notifier interface {
-	Notify(message string)
+	Notify(event health.HealthEventDetail) error
 }
 
-func LambdaHandler(ctx context.Context, event events.CloudWatchEvent) error {
+func LambdaHandler(ctx context.Context, event health.HealthEvent) error {
+	s, err := slack.New()
+	if err != nil {
+		log.Fatalf("%s", err)
+	}
+	s.Notify(event)
 
 	return nil
 }
