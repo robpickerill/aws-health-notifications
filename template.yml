@@ -37,10 +37,7 @@ Resources:
               source:
                 - aws.health
               detail-type:
-                - AWS Health Event`
-              detail:
-                service:
-                  - RDS
+                - AWS Health Event
       AutoPublishAlias: !Ref Version
       DeploymentPreference:
         Type: Linear10PercentEvery1Minute
