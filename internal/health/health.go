@@ -1,3 +1,7 @@
+package health
+
+import "encoding/json"
+
 type HealthEventDetail struct {
 	EventArn          string                        `json:"eventArn"`
 	Service           string                        `json:"service"`

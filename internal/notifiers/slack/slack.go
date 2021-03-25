@@ -69,7 +69,7 @@ func New() (*SlackClient, error) {
 	return &client, nil
 }
 
-func (s *SlackClient) Notify(event HealthEventDetail) error {
+func (s *SlackClient) Notify(event health.HealthEventDetail) error {
 	slackRequest := SlackMessage{
 		Text:      message,
 		Username:  s.UserName,
