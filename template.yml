@@ -1,0 +1,129 @@
+---
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Using AWS Eventbridge, send AWS Health events to slack.
+
+Parameters:
+  Version:
+    Type: String
+  Webhook:
+    Type: String
+
+Globals:
+  Function:
+    MemorySize: 128       # MB
+    Timeout: 5            # Seconds
+
+Resources:
+  LambdaFunction:
+    DependsOn: LambdaLogGroup
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: aws-health-to-slack
+      CodeUri: ./cmd/aws-health-to-slack/main.go
+      Handler: as-health-to-slack
+      Runtime: go1.x
+      Environment:
+        Variables:
+          DEBUG: false
+          SLACK_WEBHOOK_TOKEN_PARAM_PATH: !Ref SSMParameter
+      Events:
+        DynamoDBCloudTrailEvents:
+          Type: EventBridgeHealthRule
+          Properties:
+            Pattern:
+              source:
+                - aws.health
+              detail-type:
+                - AWS Health Event`
+              detail:
+                service:
+                  - RDS
+      AutoPublishAlias: !Ref Version
+      DeploymentPreference:
+        Type: Linear10PercentEvery1Minute
+        Role: !GetAtt CodeDeployServiceRole.Arn
+        Alarms:
+          - !Ref ErrorRateAlarm
+
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambdaLimited"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codedeploy.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/aws-health-to-slack"
+      RetentionInDays: 7
+
+  ErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref SNSTopic
+      AlarmDescription: !Sub "Error rate for ${LambdaFunction} > 5% in ${AWS::Region}"
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 1
+      OKActions:
+        - !Ref SNSTopic
+      Threshold: 5
+      TreatMissingData: notBreaching
+      Metrics:
+        - Id: errorRate
+          Label: errorRate
+          Expression: errors/invocations * 100
+        - Id: invocations
+          Label: invocations
+          MetricStat:
+            Metric:
+              Namespace: AWS/Lambda
+              MetricName: Invocations
+              Dimensions:
+                - Name: FunctionName
+                  Value: !Ref LambdaFunction
+            Period: 60
+            Stat: Sum
+          ReturnData: false
+        - Id: errors
+          Label: errors
+          MetricStat:
+            Metric:
+              Namespace: AWS/Lambda
+              MetricName: Errors
+              Dimensions:
+                - Name: FunctionName
+                  Value: !Ref LambdaFunction
+            Period: 60
+            Stat: Sum
+          ReturnData: false
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      KmsMasterKeyId: alias/aws/sns
+      Subscription:
+        - Endpoint: TODO-add-subscription-email@domain.com
+          Protocol: email
+      TopicName: !Sub "${Team}-${App}-${Env}"
+
+  SSMParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: slack-webhook
+      Type: String
+      Value: !Ref Webhook
+      Description: Slack webhook
