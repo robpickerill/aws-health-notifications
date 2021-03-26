@@ -3,6 +3,8 @@ package health
 import (
 	"encoding/json"
 	"time"
+
+	"golang.org/x/text/language"
 )
 
 type Severity int
@@ -36,8 +38,8 @@ type HealthEventDetail struct {
 }
 
 type HealthEventDescription struct {
-	Language          string `json:"language"`
-	LatestDescription string `json:"latestDescription"`
+	Language          language.Tag `json:"language"`
+	LatestDescription string       `json:"latestDescription"`
 }
 
 type HealthEventAffectedEntities struct {

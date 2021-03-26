@@ -11,7 +11,7 @@
     "eventArn": "arn:aws:health:ap-southeast-2::event/AWS_ELASTICLOADBALANCING_API_ISSUE_90353408594353980",
     "service": "ELASTICLOADBALANCING",
     "eventTypeCode": "AWS_ELASTICLOADBALANCING_API_ISSUE",
-    "eventTypeCategory": "issue",
+    "eventTypeCategory": "scheduledChange",
     "startTime": "Sat, 11 Jun 2016 05:01:10 GMT",
     "endTime": "Sat, 11 Jun 2016 05:30:57 GMT",
     "eventDescription": [{

@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
+	"log"
 	"net/http"
-	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,15 +17,21 @@ import (
 type SlackClient struct {
 	WebHookUrl string
 	UserName   string
-	Channel    string
 	Client     *http.Client
 }
 
-type SlackMessage struct {
-	Username  string `json:"username,omitempty"`
-	IconEmoji string `json:"icon_emoji,omitempty"`
-	Channel   string `json:"channel,omitempty"`
-	Text      string `json:"text,omitempty"`
+type SlackBlockMessage struct {
+	Blocks []SlackBlock `json:"blocks"`
+}
+type SlackBlock struct {
+	Type string          `json:"type"`
+	Text *SlackBlockText `json:"text,omitempty"`
+}
+
+type SlackBlockText struct {
+	Type  string `json:"type,omitempty"`
+	Text  string `json:"text,omitempty"`
+	Emoji bool   `json:"emoji,omitempty"`
 }
 
 func NewSlackClient(ctx context.Context, webhook string, username string, timeout time.Duration) *SlackClient {
@@ -32,46 +39,32 @@ func NewSlackClient(ctx context.Context, webhook string, username string, timeou
 		Timeout: timeout,
 	}
 
-	slackClient := SlackClient{
+	return &SlackClient{
 		WebHookUrl: webhook,
 		UserName:   username,
 		Client:     &httpClient,
 	}
-
-	channel, exists := os.LookupEnv("SLACK_CHANNEL")
-	if exists {
-		slackClient.Channel = channel
-	}
-
-	return &slackClient
 }
 
-func (s *SlackClient) Notify(ctx context.Context, wg *sync.WaitGroup, event health.HealthEvent) error {
+func (s *SlackClient) Notify(ctx context.Context, wg *sync.WaitGroup, errorChan chan<- error, event health.HealthEvent) {
 	defer wg.Done()
 
-	sev := health.GetSeverity(event)
-
-	var message, emoji string
-	if sev == health.URGENT {
-		emoji = ":red_circle"
-	} else {
-		emoji = ":hammer_and_wrench:"
+	message, err := s.parseMessage(event)
+	if err != nil {
+		errorChan <- err
+		return
 	}
 
-	slackRequest := SlackMessage{
-		Text:      message,
-		Username:  s.UserName,
-		IconEmoji: emoji,
-		Channel:   s.Channel,
+	err = s.writeHTTPRequest(message)
+	if err != nil {
+		errorChan <- err
+		return
 	}
-
-	s.writeHTTPRequest(slackRequest)
-
-	return nil
 }
 
-func (s *SlackClient) writeHTTPRequest(message SlackMessage) error {
+func (s *SlackClient) writeHTTPRequest(message SlackBlockMessage) error {
 	body, _ := json.Marshal(message)
+	log.Printf("%+v", message)
 
 	req, err := http.NewRequest(http.MethodPost, s.WebHookUrl, bytes.NewBuffer(body))
 	if err != nil {
@@ -90,8 +83,62 @@ func (s *SlackClient) writeHTTPRequest(message SlackMessage) error {
 		return err
 	}
 	if buf.String() != "ok" {
-		return errors.New("non-ok response returned from Slack")
+		return fmt.Errorf("%s HTTP response returned from Slack with body: %s", resp.Status, buf.String())
 	}
 
 	return nil
+}
+
+func (s *SlackClient) parseMessage(event health.HealthEvent) SlackBlockMessage {
+	issueCode := humanReadableString(event.Detail.EventTypeCode, "title")
+	issueType := humanReadableString(event.Detail.EventTypeCategory, "title")
+
+	block := []SlackBlock{
+		{
+			Type: "header",
+			Text: &SlackBlockText{
+				Text: fmt.Sprintf("%s %s | %s", event.DetailType, issueType, issueCode),
+				Type: "plain_text",
+			},
+		}, {
+			Type: "section",
+			Text: &SlackBlockText{
+				Text: fmt.Sprintf("AWS Account ID: `%s` in AWS Region: `%s`", event.AccountID, event.Region),
+				Type: "mrkdwn",
+			},
+		}, {
+			Type: "divider",
+		},
+	}
+
+	for _, value := range event.Detail.EventDescription {
+		block = append(block, SlackBlock{
+			Type: "section",
+			Text: &SlackBlockText{
+				Text:  fmt.Sprintf("Lang: %s | Description: %s", value.Language, value.LatestDescription),
+				Type:  "mrkdwn",
+				Emoji: false,
+			},
+		})
+	}
+
+	return SlackBlockMessage{
+		Blocks: block,
+	}
+}
+
+func humanReadableString(s string, c string) string {
+	s = strings.Replace(s, "_", " ", -1)
+
+	switch c {
+	case "upper":
+		return strings.ToUpper(s)
+	case "lower":
+		return strings.ToLower(s)
+	case "title":
+		return strings.Title(strings.ToLower(s))
+	default:
+		return s
+	}
+
 }
