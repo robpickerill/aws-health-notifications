@@ -14,11 +14,10 @@ import (
 )
 
 type SlackClient struct {
-	WebHookUrl  string
-	UserName    string
-	Channel     string
-	Client      *http.Client
-	MessageChan chan *SlackMessage
+	WebHookUrl string
+	UserName   string
+	Channel    string
+	Client     *http.Client
 }
 
 type SlackMessage struct {
@@ -34,10 +33,9 @@ func NewSlackClient(ctx context.Context, webhook string, username string, timeou
 	}
 
 	slackClient := SlackClient{
-		WebHookUrl:  webhook,
-		UserName:    username,
-		Client:      &httpClient,
-		MessageChan: make(chan *SlackMessage, 10),
+		WebHookUrl: webhook,
+		UserName:   username,
+		Client:     &httpClient,
 	}
 
 	channel, exists := os.LookupEnv("SLACK_CHANNEL")
@@ -53,14 +51,12 @@ func (s *SlackClient) Notify(ctx context.Context, wg *sync.WaitGroup, event heal
 
 	sev := health.GetSeverity(event)
 
-	var emoji string
+	var message, emoji string
 	if sev == health.URGENT {
-		emoji = ":red_circle:"
+		emoji = ":red_circle"
 	} else {
-		emoji = ":orange_circle:"
+		emoji = ":hammer_and_wrench:"
 	}
-
-	message := "new event 1"
 
 	slackRequest := SlackMessage{
 		Text:      message,
