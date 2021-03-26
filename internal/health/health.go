@@ -49,10 +49,6 @@ func GetSeverity(event HealthEvent) Severity {
 	switch event.Detail.EventTypeCategory {
 	case "issue":
 		return URGENT
-	case "accountNotification":
-		return INFORMATION
-	case "scheduledChange":
-		return INFORMATION
 	default:
 		return INFORMATION
 	}

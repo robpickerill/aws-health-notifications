@@ -26,17 +26,7 @@ type SlackMessage struct {
 	Text      string `json:"text,omitempty"`
 }
 
-func New() (*SlackClient, error) {
-	webhook, exists := os.LookupEnv("SLACK_WEBHOOK")
-	if !exists {
-		return &SlackClient{}, errors.New("unable to find env var: SLACK_WEBHOOK")
-	}
-
-	username, exists := os.LookupEnv("SLACK_USERNAME")
-	if !exists {
-		username = "AWS Health Notifications"
-	}
-
+func NewSlackClient(webhook string, username string, timeout time.Duration) *SlackClient {
 	client := SlackClient{
 		WebHookUrl: webhook,
 		UserName:   username,
@@ -48,7 +38,7 @@ func New() (*SlackClient, error) {
 		client.Channel = channel
 	}
 
-	return &client, nil
+	return &client
 }
 
 func (s *SlackClient) Notify(event health.HealthEvent) error {
