@@ -22,28 +22,30 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: aws-health-to-slack
-      CodeUri: ./cmd/aws-health-to-slack/main.go
-      Handler: as-health-to-slack
+      CodeUri: ./lambda/aws-health-to-slack
+      Handler: aws-health-to-slack
       Runtime: go1.x
       Environment:
         Variables:
           DEBUG: false
-          SLACK_WEBHOOK_TOKEN_PARAM_PATH: !Ref SSMParameter
+          SLACKWEBHOOK: !Ref Webhook
+          SLACKUSERNAME: AWS Events Notifications
+          SLACKTIMEOUT: 3s
       Events:
-        DynamoDBCloudTrailEvents:
-          Type: EventBridgeHealthRule
+        HealthEventRule:
+          Type: CloudWatchEvent
           Properties:
             Pattern:
               source:
                 - aws.health
               detail-type:
                 - AWS Health Event
-      AutoPublishAlias: !Ref Version
-      DeploymentPreference:
-        Type: Linear10PercentEvery1Minute
-        Role: !GetAtt CodeDeployServiceRole.Arn
-        Alarms:
-          - !Ref ErrorRateAlarm
+      # AutoPublishAlias: !Ref Version
+      # DeploymentPreference:
+      #   Type: Linear10PercentEvery1Minute
+      #   Role: !GetAtt CodeDeployServiceRole.Arn
+      #   Alarms:
+      #     - !Ref ErrorRateAlarm
 
   CodeDeployServiceRole:
     Type: AWS::IAM::Role
@@ -116,11 +118,3 @@ Resources:
         - Endpoint: TODO-add-subscription-email@domain.com
           Protocol: email
       TopicName: !Sub "${Team}-${App}-${Env}"
-
-  SSMParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: slack-webhook
-      Type: String
-      Value: !Ref Webhook
-      Description: Slack webhook

@@ -2,21 +2,23 @@ package slack
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/rpickerill/aws-health-to-slack/internal/health"
 )
 
 type SlackClient struct {
-	WebHookUrl string
-	UserName   string
-	Channel    string
-	TimeOut    time.Duration
+	WebHookUrl  string
+	UserName    string
+	Channel     string
+	Client      *http.Client
+	MessageChan chan *SlackMessage
 }
 
 type SlackMessage struct {
@@ -26,58 +28,62 @@ type SlackMessage struct {
 	Text      string `json:"text,omitempty"`
 }
 
-func NewSlackClient(webhook string, username string, timeout time.Duration) *SlackClient {
-	client := SlackClient{
-		WebHookUrl: webhook,
-		UserName:   username,
-		TimeOut:    time.Duration(5 * time.Second),
+func NewSlackClient(ctx context.Context, webhook string, username string, timeout time.Duration) *SlackClient {
+	httpClient := http.Client{
+		Timeout: timeout,
+	}
+
+	slackClient := SlackClient{
+		WebHookUrl:  webhook,
+		UserName:    username,
+		Client:      &httpClient,
+		MessageChan: make(chan *SlackMessage, 10),
 	}
 
 	channel, exists := os.LookupEnv("SLACK_CHANNEL")
 	if exists {
-		client.Channel = channel
+		slackClient.Channel = channel
 	}
 
-	return &client
+	return &slackClient
 }
 
-func (s *SlackClient) Notify(event health.HealthEvent) error {
+func (s *SlackClient) Notify(ctx context.Context, wg *sync.WaitGroup, event health.HealthEvent) error {
+	defer wg.Done()
+
 	sev := health.GetSeverity(event)
 
 	var emoji string
 	if sev == health.URGENT {
 		emoji = ":red_circle:"
 	} else {
-		emoji = ":orange_circle"
+		emoji = ":orange_circle:"
 	}
 
-	message := fmt.Sprintf("%s new event", emoji)
+	message := "new event 1"
 
 	slackRequest := SlackMessage{
 		Text:      message,
 		Username:  s.UserName,
-		IconEmoji: ":hammer and wrench",
+		IconEmoji: emoji,
 		Channel:   s.Channel,
 	}
 
-	err := s.sendHTTPRequest(slackRequest)
-	if err != nil {
-		return err
-	}
+	s.writeHTTPRequest(slackRequest)
 
 	return nil
 }
 
-func (s *SlackClient) sendHTTPRequest(slackRequest SlackMessage) error {
-	slackBody, _ := json.Marshal(slackRequest)
-	req, err := http.NewRequest(http.MethodPost, s.WebHookUrl, bytes.NewBuffer(slackBody))
+func (s *SlackClient) writeHTTPRequest(message SlackMessage) error {
+	body, _ := json.Marshal(message)
+
+	req, err := http.NewRequest(http.MethodPost, s.WebHookUrl, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Add("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: s.TimeOut}
-	resp, err := client.Do(req)
+	resp, err := s.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -90,5 +96,6 @@ func (s *SlackClient) sendHTTPRequest(slackRequest SlackMessage) error {
 	if buf.String() != "ok" {
 		return errors.New("non-ok response returned from Slack")
 	}
+
 	return nil
 }

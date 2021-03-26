@@ -53,7 +53,3 @@ func GetSeverity(event HealthEvent) Severity {
 		return INFORMATION
 	}
 }
-
-func GetEnglishNotification(event HealthEvent) (string, error) {
-
-}
