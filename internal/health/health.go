@@ -24,7 +24,7 @@ type HealthEvent struct {
 	AccountID  string            `json:"account"`
 	Time       time.Time         `json:"time"`
 	Region     string            `json:"region"`
-	Resources  []string          `json:"resources"`
+	Resources  []string          `json:"resources,omitempty"`
 	Detail     HealthEventDetail `json:"detail"`
 }
 
@@ -33,10 +33,10 @@ type HealthEventDetail struct {
 	Service           string                        `json:"service"`
 	EventTypeCode     string                        `json:"eventTypeCode"`
 	EventTypeCategory string                        `json:"eventTypeCategory"`
-	StartTime         string                        `json:"startTime"`
-	EndTime           string                        `json:"endTime"`
+	StartTime         time.Time                     `json:"startTime,omitempty"`
+	EndTime           time.Time                     `json:"endTime,omitempty"`
 	EventDescription  []HealthEventDescription      `json:"eventDescription"`
-	AffectedEntities  []HealthEventAffectedEntities `json:"affectedEntities"`
+	AffectedEntities  []HealthEventAffectedEntities `json:"affectedEntities,omitempty"`
 }
 
 type HealthEventDescription struct {
