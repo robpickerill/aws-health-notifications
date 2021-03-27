@@ -58,6 +58,9 @@ func GetSeverity(event HealthEvent) Severity {
 	}
 }
 
+// -----
+// Helper functions for health events
+
 func DeCamelCase(s string) string {
 	var b strings.Builder
 

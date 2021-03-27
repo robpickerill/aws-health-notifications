@@ -97,11 +97,9 @@ func (s *SlackClient) parseMessage(event health.HealthEvent) SlackBlockMessage {
 		}, {
 			Type: "section",
 			Text: &SlackBlockText{
-				Text: fmt.Sprintf("Account ID: `%s` | Region: `%s`", event.AccountID, event.Region),
+				Text: fmt.Sprintf("Account ID: `%s` \nRegion: `%s`", event.AccountID, event.Region),
 				Type: "mrkdwn",
 			},
-		}, {
-			Type: "divider",
 		},
 	}
 
@@ -109,11 +107,28 @@ func (s *SlackClient) parseMessage(event health.HealthEvent) SlackBlockMessage {
 		block = append(block, SlackBlock{
 			Type: "section",
 			Text: &SlackBlockText{
-				Text:  fmt.Sprintf("%s | Description: %s", value.Language, value.LatestDescription),
+				Text:  fmt.Sprintf("Description: %s", value.LatestDescription),
 				Type:  "mrkdwn",
 				Emoji: false,
 			},
 		})
+	}
+
+	if e := event.Detail.AffectedEntities; len(e) > 0 {
+		block = append(block, SlackBlock{
+			Type: "divider",
+		})
+
+		for _, v := range e {
+			block = append(block, SlackBlock{
+				Type: "section",
+				Text: &SlackBlockText{
+					Text:  fmt.Sprintf("ID: `%s` Tags: `%s`", v.EntityValue, v.Tags),
+					Type:  "mrkdwn",
+					Emoji: false,
+				},
+			})
+		}
 	}
 
 	return SlackBlockMessage{
