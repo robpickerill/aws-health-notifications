@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -49,13 +48,9 @@ func NewSlackClient(ctx context.Context, webhook string, username string, timeou
 func (s *SlackClient) Notify(ctx context.Context, wg *sync.WaitGroup, errorChan chan<- error, event health.HealthEvent) {
 	defer wg.Done()
 
-	message, err := s.parseMessage(event)
-	if err != nil {
-		errorChan <- err
-		return
-	}
+	message := s.parseMessage(event)
 
-	err = s.writeHTTPRequest(message)
+	err := s.writeHTTPRequest(message)
 	if err != nil {
 		errorChan <- err
 		return
@@ -64,7 +59,6 @@ func (s *SlackClient) Notify(ctx context.Context, wg *sync.WaitGroup, errorChan 
 
 func (s *SlackClient) writeHTTPRequest(message SlackBlockMessage) error {
 	body, _ := json.Marshal(message)
-	log.Printf("%+v", message)
 
 	req, err := http.NewRequest(http.MethodPost, s.WebHookUrl, bytes.NewBuffer(body))
 	if err != nil {
@@ -90,8 +84,8 @@ func (s *SlackClient) writeHTTPRequest(message SlackBlockMessage) error {
 }
 
 func (s *SlackClient) parseMessage(event health.HealthEvent) SlackBlockMessage {
-	issueCode := humanReadableString(event.Detail.EventTypeCode, "title")
-	issueType := humanReadableString(event.Detail.EventTypeCategory, "title")
+	issueType := health.ToTitle(health.DeCamelCase(event.Detail.EventTypeCategory))
+	issueCode := health.ToTitle(strings.Replace(event.Detail.EventTypeCode, "_", " ", -1))
 
 	block := []SlackBlock{
 		{
@@ -103,7 +97,7 @@ func (s *SlackClient) parseMessage(event health.HealthEvent) SlackBlockMessage {
 		}, {
 			Type: "section",
 			Text: &SlackBlockText{
-				Text: fmt.Sprintf("AWS Account ID: `%s` in AWS Region: `%s`", event.AccountID, event.Region),
+				Text: fmt.Sprintf("Account ID: `%s` | Region: `%s`", event.AccountID, event.Region),
 				Type: "mrkdwn",
 			},
 		}, {
@@ -115,7 +109,7 @@ func (s *SlackClient) parseMessage(event health.HealthEvent) SlackBlockMessage {
 		block = append(block, SlackBlock{
 			Type: "section",
 			Text: &SlackBlockText{
-				Text:  fmt.Sprintf("Lang: %s | Description: %s", value.Language, value.LatestDescription),
+				Text:  fmt.Sprintf("%s | Description: %s", value.Language, value.LatestDescription),
 				Type:  "mrkdwn",
 				Emoji: false,
 			},
@@ -125,20 +119,4 @@ func (s *SlackClient) parseMessage(event health.HealthEvent) SlackBlockMessage {
 	return SlackBlockMessage{
 		Blocks: block,
 	}
-}
-
-func humanReadableString(s string, c string) string {
-	s = strings.Replace(s, "_", " ", -1)
-
-	switch c {
-	case "upper":
-		return strings.ToUpper(s)
-	case "lower":
-		return strings.ToLower(s)
-	case "title":
-		return strings.Title(strings.ToLower(s))
-	default:
-		return s
-	}
-
 }

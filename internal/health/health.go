@@ -2,7 +2,9 @@ package health
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
+	"unicode"
 
 	"golang.org/x/text/language"
 )
@@ -54,4 +56,57 @@ func GetSeverity(event HealthEvent) Severity {
 	default:
 		return INFORMATION
 	}
+}
+
+func DeCamelCase(s string) string {
+	var b strings.Builder
+
+	priorLowOrNum := false
+	for _, v := range s {
+		if priorLowOrNum && unicode.IsUpper(v) {
+			b.WriteString(" ")
+		}
+		b.WriteRune(v)
+		priorLowOrNum = unicode.IsLower(v) || unicode.IsNumber(v)
+	}
+
+	return b.String()
+}
+
+func ToTitle(s string) string {
+	// using a map for lookup efficiency
+	capitalisedAcroynms := map[string]bool{
+		"aws": true,
+		"ec2": true,
+		"rds": true,
+		"api": true,
+	}
+
+	lowercaseWords := map[string]bool{
+		"a":   true,
+		"an":  true,
+		"on":  true,
+		"the": true,
+		"to":  true,
+	}
+
+	words := strings.Fields(s)
+
+	for i, v := range words {
+		lower := strings.ToLower(v)
+
+		if capitalisedAcroynms[lower] {
+			words[i] = strings.ToUpper(lower)
+			continue
+		}
+
+		if lowercaseWords[lower] && i != 0 {
+			words[i] = lower
+			continue
+		}
+
+		words[i] = strings.Title(lower)
+	}
+
+	return strings.Join(words, " ")
 }
